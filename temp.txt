@@ -1,0 +1,57 @@
+		dict_train_de_word_int, dict_de_int_word = make_vocab(train_de, language="de")
+		dict_train_en_word_int, dict_en_int_word = make_vocab(train_en, language="en")
+
+		#GERMAN SENTENCES
+		#List to store all sentences in Integers
+		train_de_stoi = []
+		#Reading individual sentences 
+		for s in train_de:
+			#print("The Senetence : ",s)
+			#List to store Individual sentence in Words
+			temp_de = []
+			#Sentence Converted to Tokens
+			token_list = tokenize_de(s)
+			#Appending SOS in the beginning
+			temp_de.append(dict_train_de_word_int['<s>'])
+			#Reading the individual tokens
+			for token in token_list:
+				#Appending the Integers for Words to a list from the Sictionary
+				temp_de.append(dict_train_de_word_int[token])
+			#Finally appending the EOS in the end
+			temp_de.append(dict_train_de_word_int['</s>'])
+			#print("The converted Senetence : ",temp_de)
+			#Finally appending each sentence to this list
+			train_de_stoi.append(temp_de)
+			
+		#ENGLISH SENTENCES
+		#List to store all sentences in Integers
+		train_en_stoi = []
+		#Reading individual sentences 
+		for s in train_en:
+			#print("The Senetence : ",s)
+			#List to store Individual sentence in Words
+			temp_en = []
+			#Sentence Converted to Tokens
+			token_list = tokenize_en(s)
+			#Appending SOS in the beginning
+			temp_en.append(dict_train_en_word_int['<s>'])
+			#Reading the individual tokens
+			for token in token_list:
+				#Appending the Integers for Words to a list from the Dictionary
+				temp_en.append(dict_train_en_word_int[token])
+			#Finally appending the EOS in the end
+			temp_en.append(dict_train_en_word_int['</s>'])
+			#print("The converted Senetence : ",temp_en)
+			#Finally appending each sentence to this list
+			train_en_stoi.append(temp_en)
+			
+			
+
+The shape of Input Vectors are 
+1. Source : torch.Size([5, 17])
+2. Target : torch.Size([5, 16])
+3. Source_Mask : torch.Size([5, 1, 17])
+4. TGT_Mask : torch.Size([5, 16, 16])	
+	
+The Shape of Output Vector is :  torch.Size([5, 16, 512])
+

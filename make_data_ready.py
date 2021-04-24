@@ -43,23 +43,3 @@ def download_data_and_unzip(data_directory):
 directory = "./data"
 uncompressed_data_path = download_data_and_unzip(directory)
 
-def read_data_return_lists(directory_path):
-	
-	train_de = [l.strip() for l in open(os.path.join(directory_path,"train.de"), 'r', encoding='utf-8')]
-	train_en = [l.strip() for l in open(os.path.join(directory_path,"train.en"), 'r', encoding='utf-8')]
-	val_de = [l.strip() for l in open(os.path.join(directory_path,"val.de"), 'r', encoding='utf-8')]
-	val_en = [l.strip() for l in open(os.path.join(directory_path,"val.en"), 'r', encoding='utf-8')]
-	test_de = [l.strip() for l in open(os.path.join(directory_path,"test.de"), 'r', encoding='utf-8')]
-	test_en = [l.strip() for l in open(os.path.join(directory_path,"test.en"), 'r', encoding='utf-8')]
-	
-	train_de = train_de[:-1]
-	train_en = train_en[:-1]
-	val_de = val_de[:-1]
-	val_en = val_en[:-1]
-	
-	return train_de, train_en, val_de, val_en, test_de, test_en
-	
-train_de, train_en, val_de, val_en, test_de, test_en = read_data_return_lists(uncompressed_data_path)
-
-print(len(train_de), len(train_en), len(val_de), len(val_en), len(test_de), len(test_en))
-

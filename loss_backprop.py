@@ -11,11 +11,9 @@ def loss_backprop(generator, criterion, out, targets, normalize, bp=True):
     total = 0.0
     out_grad = []
     
-    list_for_all_words_in_sentences = []
     for i in range(out.size(1)):
         out_column = Variable(out[:, i].data, requires_grad=True)
         gen = generator(out_column)
-        list_for_all_words_in_sentences.append(word_index_list_time_step_for_batch(gen))
         loss = criterion(gen, targets[:, i]) / normalize
         total += loss.data
         loss.backward()
@@ -24,15 +22,4 @@ def loss_backprop(generator, criterion, out, targets, normalize, bp=True):
         out_grad = torch.stack(out_grad, dim=1)
         out.backward(gradient=out_grad)
 
-  
-    predicted_sentences = np.transpose(np.array(list_for_all_words_in_sentences))
-    target_sentences = np.array(targets.cpu())
-
-    return total, predicted_sentences
-    
-def word_index_list_time_step_for_batch(predicted_sentence):
-	
-	list_time_step_for_batch = []
-	for line in predicted_sentence:
-		list_time_step_for_batch.append(int(torch.argmax(line)))
-	return list_time_step_for_batch
+    return total

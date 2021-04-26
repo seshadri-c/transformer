@@ -11,87 +11,114 @@ from make_vocab import *
 from bleu import list_bleu
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 import random
+from utils import *
+	
 
+def read_sentences(n, src, tgt, out, generator):
 	
-def calculate_bleu_scores(src, tgt, pred, dict_src_int_word, dict_tgt_int_word):
+	source_n = []
+	target_n = []
+	predicted_n = []
 	
-	#SOURCE
-	src_sent_batch = []
-	for i in range(src.shape[0]):
-		src_int_s = src[i]
-		src_word_s = []
-		for num in src_int_s:
-			if not (num == 0 or num ==1 or num ==2):
-				src_word_s.append(dict_src_int_word[num])
-		src_sent_batch.append(TreebankWordDetokenizer().detokenize(src_word_s))	
-	
-	#TARGET	
-	tgt_sent_batch = []
-	for i in range(tgt.shape[0]):
-		tgt_int_s = tgt[i]
-		tgt_word_s = []
-		for num in tgt_int_s:
-			if not (num == 0 or num ==1 or num ==2):
-				tgt_word_s.append(dict_tgt_int_word[num])
-		tgt_sent_batch.append(TreebankWordDetokenizer().detokenize(tgt_word_s))	
+	batch_size = src.shape[0]
+	for b in range(batch_size):
+		source = list(np.array(src[b]))
+		source_n.append(source)
+		target = list(np.array(tgt[b]))
+		target_n.append(target)
+		output = out[b]
+		predicted = []
+		for i in range(output.size(0)):
+			out_column = Variable(output[i].data, requires_grad=True)
+			gen = generator(out_column)
+			predicted.append(int(torch.argmax(gen)))
+		predicted_n.append(predicted)
 		
-	#PREDICTED
-	pred_sent_batch = []
-	for i in range(pred.shape[0]):
-		pred_int_s = pred[i]
-		pred_word_s = []
-		for num in pred_int_s:
-			try:
-				if not (num == 0 or num ==1 or num ==2):
-					pred_word_s.append(dict_tgt_int_word[num])
-			except:
-				continue
-		pred_sent_batch.append(TreebankWordDetokenizer().detokenize(pred_word_s))
+		if(b==n-1):
+			break
+			
+	return (source_n, target_n, predicted_n)
+
 		
-	#for i in range(len(src_sent_batch)):
-		#print("\n\n\nSource Sentence : {}\nTarget Sentence : {}\nPredicted Sentence : {}".format(src_sent_batch[i],tgt_sent_batch[i],pred_sent_batch[i]))
-	
-	bleu_score = list_bleu(tgt_sent_batch, pred_sent_batch)
-	return bleu_score, src_sent_batch, tgt_sent_batch, pred_sent_batch
-	
-def print_random_n_triplets(src_sent_batch, tgt_sent_batch, pred_sent_batch,n):
-	list_random_numbers = random.sample(range(0, len(src_sent_batch)), n)
-	print("\n\nThe Random {} triplets are : ".format(n))
-	i=1
-	for r in list_random_numbers :
-		print("\n{}. Source : {}\nTarget : {}\nPredicted : {}\n\n".format(i, src_sent_batch[r], tgt_sent_batch[r], pred_sent_batch[r]))
-		i+=1
-		
-def train_epoch(epoch, train_loader, model, criterion, model_opt, dict_train_de_word_int, dict_train_de_int_word, dict_train_en_word_int, dict_train_en_int_word):
+def train_epoch(epoch, train_loader, model, criterion, model_opt):
 	
 	model.train()
 	progress_bar = tqdm(enumerate(train_loader))
 	total_loss = 0.0
-	
 	for step, (src, tgt, src_mask, tgt_mask) in progress_bar:
+		#print("The shapes are : ",src.shape, tgt[:, :-1].shape, src_mask.shape, tgt_mask[:, :-1, :-1].shape)
 		out = model.forward(src.cuda(), tgt[:, :-1].cuda(), src_mask.cuda(), tgt_mask[:, :-1, :-1].cuda())
+		#print("Output Shape : ",out.shape)
 		ntokens = np.array(tgt[:,:-1]).shape[1]
-		loss = loss_backprop(model.generator, criterion, out, tgt[:, 1:].cuda(), ntokens, step)
+		loss = loss_backprop(model.generator, criterion, out, tgt[:, 1:].cuda(), ntokens)
 		total_loss +=loss
 		model_opt.step()
 		model_opt.optimizer.zero_grad()
 		progress_bar.set_description("Epoch : {} \t Training Loss : {}".format(epoch+1, int(total_loss / (step + 1)))) 
 		progress_bar.refresh()
+		
 	return total_loss/(step+1), model, model_opt			
-    	
-def	training_testing(train_loader, model, criterion, model_opt, num_epochs, dict_train_de_word_int, dict_train_de_int_word, dict_train_en_word_int, dict_train_en_int_word):
-	
-	data_path = "./data/multi30k/uncompressed_data"
-	train_de, train_en, val_de, val_en, test_de, test_en = read_data_return_lists(data_path)
-	
 
+def valid_epoch(epoch, valid_loader, model, criterion):
+	
+	model.eval()
+	progress_bar = tqdm(enumerate(valid_loader))
+	total_loss = 0.0
+	total_tokens = 0
+	for step, (src, tgt, src_mask, tgt_mask) in progress_bar:
+		#print("The shapes are : ",src.shape, tgt[:, :-1].shape, src_mask.shape, tgt_mask[:, :-1, :-1].shape)
+		out = model.forward(src.cuda(), tgt[:, :-1].cuda(), src_mask.cuda(), tgt_mask[:, :-1, :-1].cuda())
+		#print("Output Shape : ",out.shape)
+		ntokens = np.array(tgt[:,:-1]).shape[1]
+		loss = loss_backprop(model.generator, criterion, out, tgt[:, 1:].cuda(), ntokens, bp=False)
+		total_loss +=loss
+		progress_bar.set_description("Epoch : {} \t Validation Loss : {}".format(epoch+1, int(total_loss / (step + 1)))) 
+		progress_bar.refresh()
+		
+		source_n, target_n, predicted_n = read_sentences(3, src, tgt, out,model.generator)
+		
+		
+	return total_loss/(step+1), source_n, target_n, predicted_n
+		
+def convert_sentences(list_n, dict_int_word):
+	
+	sentence_list = []
+	for s in list_n:
+		if(s is not None):
+			temp = []
+			for t in s:
+				if(t==1):
+					break
+				if(t!=0 and t!=2):
+					temp.append(dict_int_word[t])
+			x = ' '.join(word for word in temp)
+			sentence_list.append(x)
+		
+	return sentence_list
+	
+def	training_testing(train_loader, val_loader, model, criterion, model_opt, num_epochs, dict_train_de_word_int, dict_train_de_int_word, dict_train_en_word_int, dict_train_en_int_word):
+	
 	for epoch in range(num_epochs):
 		
 		print("\n\nTraining : ")
 		print("Starting Epoch No : {}".format(epoch+1))
-		total_train_loss, model, model_opt = train_epoch(epoch,train_loader, model, criterion, model_opt, dict_train_de_word_int, dict_train_de_int_word, dict_train_en_word_int, dict_train_en_int_word)
-		print("Epoch No {} completed. Total Training Loss : {}".format(epoch+1,total_train_loss))
-
+		total_train_loss, model, model_opt = train_epoch(epoch,train_loader, model, criterion, model_opt)
+		print("Epoch No {} completed. Total Training Loss : {}".format(epoch+1,total_train_loss))		
+		total_val_loss, source_n, target_n, predicted_n = valid_epoch(epoch,val_loader, model, criterion)
+		print("Epoch No {} completed. Total Validation Loss : {}".format(epoch+1,total_val_loss))
+		source_sent = convert_sentences(source_n, dict_train_de_int_word)
+		target_sent = convert_sentences(target_n, dict_train_en_int_word)
+		predicted_sent = convert_sentences(predicted_n, dict_train_en_int_word)
+		for i in range(len(source_sent)):
+			print("\n\n Pair : ",i+1)
+			print("Source Sentence : ",source_sent[i])
+			print("Target Sentence : ",target_sent[i])
+			print("Predicted Sentence : ",predicted_sent[i])
+		print("The BLEU Score is : ",list_bleu(target_sent, predicted_sent))	
+		
+		if(total_val_loss>total_train_loss):
+			print("Training Complete")
+			break	
 		
 def main():
 	
@@ -110,8 +137,9 @@ def main():
 	criterion = LabelSmoothing(size=len(dict_train_en_word_int.keys()), padding_idx=2, smoothing=0.1)
 	criterion.cuda()
 	
-	train_loader = load_data(data_path+"/train", batch_size=5, num_workers=2, shuffle=True)
+	train_loader = load_data(data_path+"/train", batch_size=128, num_workers=10, shuffle=True)
+	val_loader = load_data(data_path+"/val", batch_size=128, num_workers=10, shuffle=True)
 	
 	num_epochs = 10
-	training_testing(train_loader, model, criterion, model_opt, num_epochs, dict_train_de_word_int, dict_train_de_int_word, dict_train_en_word_int, dict_train_en_int_word)	
+	training_testing(train_loader, val_loader, model, criterion, model_opt, num_epochs, dict_train_de_word_int, dict_train_de_int_word, dict_train_en_word_int, dict_train_en_int_word)	
 main()

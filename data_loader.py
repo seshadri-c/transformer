@@ -79,8 +79,14 @@ def word_to_int(sent_batch,language):
 		dict_word_int = dict_train_en_word_int
 		
 	for s in sent_batch:
-		t = [dict_word_int[t] for t in s]
-		int_sent_batch.append(t)
+		temp = []
+		for t in s:
+			try:
+				temp.append(dict_word_int[t])
+			except:
+				temp.append(2)
+				
+		int_sent_batch.append(temp)
 		
 	return int_sent_batch
 	
